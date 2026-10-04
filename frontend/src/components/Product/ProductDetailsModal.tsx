@@ -54,9 +54,6 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
                 alt={product.name}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-full text-xs font-bold text-[#4C1D95] shadow-xs">
-                {product.category}
-              </div>
             </div>
 
             {/* Dynamic Store Color Badge */}
@@ -70,7 +67,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
             >
               <div>
                 <div className="text-xs font-extrabold">{product.storeName}</div>
-                <div className="text-[11px] opacity-80">{product.storeAddress}</div>
+                <div className="text-[11px] opacity-80">{product.storeAddress ?? ''}</div>
               </div>
               <span className="px-2 py-0.5 rounded-full bg-white/70 text-xs font-bold text-[#0C4A6E]">
                 {product.distanceKm} km
@@ -78,7 +75,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Right Column: Details, Description, Store Map, Add to Cart */}
+          {/* Right Column: Details, Store Map, Add to Cart */}
           <div className="p-6 flex flex-col justify-between">
             <div>
               <div className="flex items-center space-x-2 text-xs font-semibold text-gray-400 mb-1">
@@ -100,11 +97,6 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
                 ${product.price.toFixed(2)}
               </div>
 
-              {/* Full Description */}
-              <div className="text-xs text-gray-600 leading-relaxed mb-4 max-h-24 overflow-y-auto">
-                {product.description}
-              </div>
-
               {/* Exact Store Location Map */}
               <div className="mb-4">
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
@@ -112,7 +104,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
                 </label>
                 <StoreMap
                   storeName={product.storeName}
-                  storeAddress={product.storeAddress}
+                  storeAddress={product.storeAddress ?? ''}
                   distanceKm={product.distanceKm}
                   deliveryAddress={deliveryAddress}
                   height="h-36"

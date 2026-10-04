@@ -17,11 +17,9 @@ export interface Product {
   id: string;
   name: string;
   price: number;
-  description: string;
   storeName: string;
-  storeAddress: string;
+  storeAddress?: string;
   image: string;
-  category: string;
   distanceKm: number;
   coordinates: Coordinates;
   rating?: number;

@@ -53,8 +53,10 @@ export const STORES: Store[] = [
   },
 ];
 
+type MockProduct = Product & { description: string; category: string };
+
 // Curated products demonstrating multi-store price comparisons (Bread, Milk, Croissants, Coffee, etc.)
-export const INITIAL_PRODUCTS: Product[] = [
+export const INITIAL_PRODUCTS: MockProduct[] = [
   {
     id: 'prod-1',
     name: 'Artisan Sourdough Bread',

@@ -129,7 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
             <p className="text-[11px] text-gray-400 mt-2 italic">
-              *Selecting &quot;Closest&quot; always restores the initial localized order.
+              *Closest sorts by distance from your location.
             </p>
           </div>
 

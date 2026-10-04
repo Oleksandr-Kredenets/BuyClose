@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Product,
   Order,
@@ -7,9 +7,9 @@ import {
   UserProfile,
   SortMode,
   CartItem,
+  Coordinates,
 } from './types';
 import {
-  INITIAL_PRODUCTS,
   INITIAL_ORDERS,
   INITIAL_CARDS,
   INITIAL_NOTIFICATIONS,
@@ -26,28 +26,24 @@ import { NotificationsModal } from './components/Header/NotificationsModal';
 import { ProfileModal } from './components/Header/ProfileModal';
 import { AuthModal } from './components/Auth/AuthModal';
 import { CartDrawer } from './components/Cart/CartDrawer';
+import { searchProducts } from './api/products';
 
 export const App: React.FC = () => {
-  // 1. Initial products saved locally to guarantee deterministic revert to "Closest"
-  // State Management Requirement: "save the initial array locally so the user can easily revert back to this exact 'Closest' order."
-  const initialProductsSnapshot = useRef<Product[]>([...INITIAL_PRODUCTS]);
-
-  // Client-Side Filter & Sort State
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('closest');
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
 
-  // Price range calculation
-  const allPrices = useMemo(() => INITIAL_PRODUCTS.map((p) => p.price), []);
-  const minPrice = Math.floor(Math.min(...allPrices));
-  const maxPrice = Math.ceil(Math.max(...allPrices));
-  const [priceRange, setPriceRange] = useState<[number, number]>([minPrice, maxPrice]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1]);
 
   // Sidebar visibility
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // User Profile & Authentication State
   const [profile, setProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
+  const [deviceCoordinates, setDeviceCoordinates] = useState<Coordinates | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [registeredAccounts, setRegisteredAccounts] = useState<string[]>(INITIAL_REGISTERED_EMAILS);
 
@@ -57,10 +53,7 @@ export const App: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
 
   // Cart State
-  const [cartItems, setCartItems] = useState<CartItem[]>([
-    { product: INITIAL_PRODUCTS[0], quantity: 1 },
-    { product: INITIAL_PRODUCTS[5], quantity: 1 },
-  ]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
   // Modals & Drawers State
   const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
@@ -70,28 +63,110 @@ export const App: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const searchLocation = profile.useDeviceGps && deviceCoordinates
+    ? deviceCoordinates
+    : profile.addressCoordinates;
 
-  // List of unique store names for filtering
-  const uniqueStores = useMemo(() => {
-    return Array.from(new Set(INITIAL_PRODUCTS.map((p) => p.storeName)));
-  }, []);
+  const uniqueStores = useMemo(
+    () => Array.from(new Set(products.map((product) => product.storeName))),
+    [products]
+  );
+
+  const { minPrice, maxPrice } = useMemo(() => {
+    if (products.length === 0) {
+      return { minPrice: 0, maxPrice: 1 };
+    }
+
+    const prices = products.map((product) => product.price);
+    const minimum = Math.floor(Math.min(...prices));
+    return {
+      minPrice: minimum,
+      maxPrice: Math.max(Math.ceil(Math.max(...prices)), minimum + 1),
+    };
+  }, [products]);
+
+  useEffect(() => {
+    const title = searchQuery.trim();
+    if (!title) {
+      setProducts([]);
+      setSearchError(null);
+      setIsSearching(false);
+      setPriceRange([0, 1]);
+      return;
+    }
+
+    const controller = new AbortController();
+    setProducts([]);
+    setSearchError(null);
+    setIsSearching(true);
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const results = await searchProducts(title, searchLocation, controller.signal);
+        setProducts(results);
+        if (results.length > 0) {
+          const prices = results.map((product) => product.price);
+          const minimum = Math.floor(Math.min(...prices));
+          setPriceRange([
+            minimum,
+            Math.max(Math.ceil(Math.max(...prices)), minimum + 1),
+          ]);
+        } else {
+          setPriceRange([0, 1]);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setProducts([]);
+          setSearchError(error instanceof Error ? error.message : 'Product search failed.');
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSearching(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [
+    searchQuery,
+    searchLocation.lat,
+    searchLocation.lng,
+    profile.useDeviceGps,
+  ]);
+
+  const requestDeviceLocation = (): Promise<Coordinates> => new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by this browser.'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coordinates = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setDeviceCoordinates(coordinates);
+        resolve(coordinates);
+      },
+      (error) => {
+        const message = error.code === error.PERMISSION_DENIED
+          ? 'Location permission was denied. Allow location access in your browser settings to use GPS.'
+          : error.code === error.POSITION_UNAVAILABLE
+            ? 'Your current location is unavailable.'
+            : 'The location request timed out. Please try again.';
+        reject(new Error(message));
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
 
   // Filter and Sort Pipeline
   const filteredAndSortedProducts = useMemo(() => {
-    // Start with the exact initial array snapshot for "Closest"
-    let list = [...initialProductsSnapshot.current];
-
-    // Filter by search query (product name, description, or store name)
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.description.toLowerCase().includes(q) ||
-          p.storeName.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q)
-      );
-    }
+    let list = [...products];
 
     // Filter by store
     if (selectedStore) {
@@ -104,26 +179,17 @@ export const App: React.FC = () => {
     );
 
     // Apply Sorting:
-    // If 'closest', preserve the saved initial array order (filtered)
-    // If 'cheapest' or 'expensive', apply price comparator
+    // Sort the API results by the selected price or calculated distance.
     if (sortMode === 'cheapest') {
       list.sort((a, b) => a.price - b.price);
     } else if (sortMode === 'expensive') {
       list.sort((a, b) => b.price - a.price);
     } else if (sortMode === 'closest') {
-      // Guaranteed fallback to original localized distance order
-      const initialOrderMap = new Map(
-        initialProductsSnapshot.current.map((item, idx) => [item.id, idx])
-      );
-      list.sort((a, b) => {
-        const indexA = initialOrderMap.get(a.id) ?? 0;
-        const indexB = initialOrderMap.get(b.id) ?? 0;
-        return indexA - indexB;
-      });
+      list.sort((a, b) => a.distanceKm - b.distanceKm);
     }
 
     return list;
-  }, [searchQuery, selectedStore, priceRange, sortMode]);
+  }, [products, selectedStore, priceRange, sortMode]);
 
   // Cart operations
   const handleAddToCart = (product: Product, quantity: number = 1) => {
@@ -266,11 +332,21 @@ export const App: React.FC = () => {
 
         {/* 3. Product Grid Area (Strict 7 columns, exactly 2 rows visible height, vertically scrollable) */}
         <section className={`transition-all duration-300 ${isSidebarOpen ? 'pl-76' : 'pl-4'}`}>
-          <ProductGrid
-            products={filteredAndSortedProducts}
-            onAddToCart={(p) => handleAddToCart(p, 1)}
-            onOpenDetails={(p) => setDetailsProduct(p)}
-          />
+          {isSearching ? (
+            <p className="py-4 text-center text-xs text-gray-500" role="status">
+              Searching products…
+            </p>
+          ) : searchError ? (
+            <p className="py-4 text-center text-xs text-red-600" role="alert">
+              {searchError}
+            </p>
+          ) : (
+            <ProductGrid
+              products={filteredAndSortedProducts}
+              onAddToCart={(p) => handleAddToCart(p, 1)}
+              onOpenDetails={(p) => setDetailsProduct(p)}
+            />
+          )}
         </section>
       </main>
 
@@ -316,6 +392,7 @@ export const App: React.FC = () => {
           profile={profile}
           onClose={() => setIsProfileOpen(false)}
           onUpdateProfile={(updated) => setProfile(updated)}
+          onRequestDeviceLocation={requestDeviceLocation}
         />
       )}
 

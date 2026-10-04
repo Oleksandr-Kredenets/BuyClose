@@ -1,22 +1,41 @@
 import React, { useState } from 'react';
-import { UserProfile } from '../../types';
+import { Coordinates, UserProfile } from '../../types';
 import { CloseIcon, MapPinIcon, UserIcon } from '../Common/Icons';
 
 interface ProfileModalProps {
   profile: UserProfile;
   onClose: () => void;
   onUpdateProfile: (updated: UserProfile) => void;
+  onRequestDeviceLocation: () => Promise<Coordinates>;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   profile,
   onClose,
   onUpdateProfile,
+  onRequestDeviceLocation,
 }) => {
   const [name, setName] = useState(profile.name);
   const [deliveryAddress, setDeliveryAddress] = useState(profile.deliveryAddress);
   const [useDeviceGps, setUseDeviceGps] = useState(profile.useDeviceGps);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  const handleGpsChange = async (enabled: boolean) => {
+    setLocationError(null);
+    if (!enabled) {
+      setUseDeviceGps(false);
+      return;
+    }
+
+    try {
+      await onRequestDeviceLocation();
+      setUseDeviceGps(true);
+    } catch (error) {
+      setUseDeviceGps(false);
+      setLocationError(error instanceof Error ? error.message : 'Unable to get your location.');
+    }
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,19 +125,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <div>
                 <div className="font-bold text-[#0C4A6E]">Device GPS Mode</div>
                 <div className="text-[10px] text-gray-500">
-                  {useDeviceGps ? 'Using live device GPS sensor' : 'Using Delivery Address anchor (Recommended)'}
+                  {useDeviceGps ? 'Using live device GPS sensor' : 'Use your location (browser permission required)'}
                 </div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
                   checked={useDeviceGps}
-                  onChange={(e) => setUseDeviceGps(e.target.checked)}
+                  onChange={(e) => void handleGpsChange(e.target.checked)}
                   className="sr-only peer"
                 />
                 <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#4C1D95]"></div>
               </label>
             </div>
+            {locationError && (
+              <div className="text-[11px] text-red-600" role="alert">
+                {locationError}
+              </div>
+            )}
           </div>
 
           {savedSuccess && (

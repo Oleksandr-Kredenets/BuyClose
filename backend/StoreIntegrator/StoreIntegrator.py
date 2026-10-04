@@ -22,6 +22,7 @@ def search():
     data = request.get_json()
     title = data.get('title')
     links = data.get('links')
+    print(links)
 
     response = []
 

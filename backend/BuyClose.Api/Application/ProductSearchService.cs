@@ -100,5 +100,5 @@ public sealed record ProductResponse(
 
 /// <summary>Product coordinates; the JSON field "lag" preserves the requested API contract.</summary>
 public sealed record ProductLocation(
-    [property: System.Text.Json.Serialization.JsonPropertyName("lag")] double Latitude,
+    [property: System.Text.Json.Serialization.JsonPropertyName("lat")] double Latitude,
     [property: System.Text.Json.Serialization.JsonPropertyName("lng")] double Longitude);
