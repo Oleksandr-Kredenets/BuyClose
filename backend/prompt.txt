@@ -1,0 +1,103 @@
+Ти - досвідчений та висококваліфікований dotnet інженер-розробник з глибоким розумінням принципів архітектури, який пише backend частину веб-додатку на Asp .NET core.
+Контекст:
+    - Ти пишеш сайт, який за запитом користувача шукає товари в різних магазинах та відображає найближчий магазин, який продає цей товар.
+    - backend частина має надіслати frontend частині json файл з переліком продуктів. Формат відповіді:
+[
+    {
+        id: 0000000000000000,
+        title: "",
+        price: 0.00,
+        description: "",
+        imgUrl: "",
+        market: "",
+        location: {
+                    lag: 0.00,
+                    lng: 0.00
+        }
+    },
+    ...
+]
+    - Разом із backend частиною запущений сервер на 127.0.0.1:4567, який за назвою товару визначає, в якому магазині може продаватись цей товар. Для перевірки дієздатності можна звернутися за 127.0.0.1:4567 та отримати json {"response": "ok"}
+    - Разом із backend частиною запущений сервер на 127.0.0.1:4568, який шукає товар по кожному сайту зі списку посилань та парсить дані по цьому товару.
+
+Завдання:
+    1. Написати на C# Asp .NET core backend частину додатку, яка має:
+        1) отримати від frontend частини назву товару та геолокацію користувача.
+        2) звернутись до серверу 127.0.0.1:4567 GET запитом за адресою 127.0.0.1:4567/predict?title=<назва товару> та отримати тип магазину, у якому продається цей товар.
+        3) надіслати запит до google maps за типом магазину та отримати магазини, які є поруч з користувачем.
+        4) зібрати з отриманих магазинів геолокацію на карті та посилання на їх сайти.
+        5) передати список посилань магазину та назву товару до серверу 127.0.0.1:4568 POST запитом за адресою 127.0.0.1:4568/search. Формат запиту наступний:
+{
+    title: "",
+    links: [
+        {
+            market: "",
+            link: ""
+        },
+        ...
+    ]
+}
+        відповідь:
+[
+    {
+        title: "",
+        price: 0.00,
+        description: "",
+        imgUrl: "",
+        market: ""
+    }
+]
+        6) для кожного продукту створити id та зі всіх даних сформувати список об'єктів типу:
+{
+    id: 0000000000000000,
+    title: "",
+    price: 0.00,
+    description: "",
+    imgUrl: "",
+    market: "",
+    location: {
+                lag: 0.00,
+                lng: 0.00
+    }
+}
+        і відправити frontend частині на 127.0.0.1:4000.
+
+    2. Притримуватись чистої архітектури і коментувати основні функції для розуміння коду.
+    3. Під час розробки знаходити оптимальні бібліотеки для роботи з іншими сервісами (наприклад, google maps).
+Обмеження:
+    Увесь код має бути у папці backend/App. Інші папки ніяким чином змінювати не можна.
+
+
+
+
+
+
+
+
+Добре. Тепер твоя задача - переписати всаємодію з google maps на взаємодію з mapbox. Необхідно прочитати актуальну інформацію по взаємодії з mapbox та адаптувати відповідь mapbox під вже існуючу структуру в BuyClose.Api. Простий приклад вдалого запиту на C#:
+```
+string accessToken = "token"
+
+double longitude = 24.0316;
+double latitude = 49.8429;
+string proximity = FormattableString.Invariant($"{longitude},{latitude}");
+
+string query = "supermarket";
+
+string url =
+    $"https://api.mapbox.com/search/searchbox/v1/forward" +
+    $"?q={Uri.EscapeDataString(query)}" +
+    $"&types=poi" +
+    $"&proximity={proximity}" +
+    $"&limit=10" +
+    $"&country=UA" +
+    $"&language=uk" +
+    $"&access_token={accessToken}";
+
+using var httpClient = new HttpClient();
+
+var response = await httpClient.GetAsync(url);
+var json = await response.Content.ReadAsStringAsync();
+```
+Приклад відпвіді:
+```{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"coordinates":[24.55782842,49.66924137],"type":"Point"},"properties":{"name":"Супермаркет","name_preferred":"Супермаркет","name_local":{"uk":"Супермаркет"},"mapbox_id":"dXJuOm1ieHBvaTo0MTRkOTRhMC1kZGE3LTRkNzUtYjMzOS0zY2E1ZGEyNjVhZWE","feature_type":"poi","address":"Halytska St","full_address":"Halytska St, Перемишляни, 81200, Україна","place_formatted":"Перемишляни, 81200, Україна","context":{"country":{"name":"Україна","country_code":"UA","country_code_alpha_3":"UKR"},"postcode":{"id":"dXJuOm1ieHBsYzpETjRPNlE","name":"81200"},"place":{"id":"dXJuOm1ieHBsYzpDYlJvNlE","name":"Перемишляни"},"address":{"name":"Halytska St","address_number":"63","street_name":"Halytska St"},"street":{"name":"Halytska St"}},"coordinates":{"latitude":49.66924137,"longitude":24.55782842,"routable_points":[{"name":"POI","latitude":49.66917674768908,"longitude":24.557752115963645}]},"language":"","maki":"grocery","poi_category":["продуктовий магазин","покупка","супермаркет"],"poi_category_ids":["grocery","shopping","supermarket"],"external_ids":{"dataplor":"3d4ce63b-f1d5-4909-be32-bedb5c1a8236"},"metadata":{"open_hours":{"periods":[{"open":{"day":0,"time":"0800"},"close":{"day":0,"time":"2200"}},{"open":{"day":1,"time":"0800"},"close":{"day":1,"time":"2200"}},{"open":{"day":2,"time":"0800"},"close":{"day":2,"time":"2200"}},{"open":{"day":3,"time":"0800"},"close":{"day":3,"time":"2200"}},{"open":{"day":4,"time":"0800"},"close":{"day":4,"time":"2200"}},{"open":{"day":5,"time":"0800"},"close":{"day":5,"time":"2200"}},{"open":{"day":6,"time":"0800"},"close":{"day":6,"time":"2200"}}]}},"distance":42449}}],"attribution":"© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subjectto the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)","response_id":"dvOsuPxXi66rMTotPSVuv-BpZJ9xTHgOSiD6hHRJi7Vq6iq12e4xRUNgf-Q44ikaxSBaFXmBVyudrmKRSqwKaGkK9S01qVHSpus="}```
